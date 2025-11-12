@@ -178,8 +178,8 @@ def evaluate_with_spcr(model, test_images_dir, device, centers=None, is_regressi
                 ab_pred = output[0]  # (2, H, W)
             else:
                 # Classification: convert logits to ab
-                logits = output[0]  # (Q, H, W)
-                ab_pred = annealed_mean_ab(logits, centers, T=0.38)
+                logits = output  # (1, Q, H, W) - keep batch dimension
+                ab_pred = annealed_mean_ab(logits, centers, T=0.38)[0]  # Get first item from batch
             
             # Get L channel
             L_np = L[0, 0].cpu().numpy()
