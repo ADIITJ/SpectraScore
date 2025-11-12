@@ -13,6 +13,7 @@ import csv
 import os
 import sys
 import subprocess
+import gc
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -235,7 +236,7 @@ def main():
     parser.add_argument("--epochs", type=int, default=5, help="Number of epochs")
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
-    parser.add_argument("--img_size", type=int, default=176, help="Image size")
+    parser.add_argument("--img_size", type=int, default=128, help="Image size (reduced to 128 to save memory)")
     parser.add_argument("--device", type=str, default="mps", help="Device (mps/cuda/cpu)")
     parser.add_argument("--test_images", type=str, default="assets/original", help="Test images for SPCR")
     args = parser.parse_args()
@@ -258,31 +259,58 @@ def main():
     
     # Compute ab bins and class weights for classification models
     print("\nCollecting ab samples from training data...")
-    ab_samples = []
-    bin_indices_list = []
+    import random
+    random.seed(42)
     
-    for img_path in list(data_dir.glob("*.jpg")) + list(data_dir.glob("*.png")):
+    all_images = list(data_dir.glob("*.jpg")) + list(data_dir.glob("*.png"))
+    print(f"Found {len(all_images)} total images")
+    
+    # CRITICAL: Sample only 2000 images for KMeans to avoid OOM
+    # KMeans on 2K images is statistically sufficient for color clustering
+    sample_size = min(2000, len(all_images))
+    sampled_images = random.sample(all_images, sample_size)
+    print(f"Sampling {sample_size} images for ab bin computation...")
+    
+    ab_samples_list = []
+    
+    # Collect ab samples from sampled images only
+    for idx, img_path in enumerate(sampled_images):
+        if idx % 500 == 0:
+            print(f"  Processing {idx}/{sample_size}...")
+        
         img = cv2.imread(str(img_path))
         if img is None:
             continue
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = cv2.resize(img, (args.img_size, args.img_size))
         
-        # Convert to Lab
         L, ab = rgb_to_lab_single(img)
+        # Subsample pixels: take every 4th pixel to reduce memory
         ab_np = ab.cpu().numpy().reshape(2, -1).T  # [H*W, 2]
-        ab_samples.append(ab_np)
+        ab_np = ab_np[::4]  # Subsample to 1/4 of pixels
+        ab_samples_list.append(ab_np)
+        
+        # Free memory every 100 images
+        if idx % 100 == 0:
+            gc.collect()
     
-    ab_samples = np.vstack(ab_samples)
-    print(f"Collected {len(ab_samples)} ab samples")
+    ab_samples = np.vstack(ab_samples_list)
+    del ab_samples_list
+    gc.collect()
+    print(f"Collected {len(ab_samples):,} ab samples from {sample_size} images")
     
     print("Computing ab bins via KMeans...")
     centers = compute_ab_bins(ab_samples, k=313, cache_path=out_dir / "ab_centers.npy")
+    del ab_samples  # Free memory after KMeans
     print(f"Centers shape: {centers.shape}")
     
-    print("Computing class rebalancing weights...")
-    # Compute bin indices for all training images
-    for img_path in list(data_dir.glob("*.jpg")) + list(data_dir.glob("*.png")):
+    print("Computing class rebalancing weights from sampled images...")
+    bin_indices_list = []
+    
+    for idx, img_path in enumerate(sampled_images):
+        if idx % 500 == 0:
+            print(f"  Computing weights {idx}/{sample_size}...")
+        
         img = cv2.imread(str(img_path))
         if img is None:
             continue
@@ -290,9 +318,16 @@ def main():
         img = cv2.resize(img, (args.img_size, args.img_size))
         L, ab = rgb_to_lab_single(img)
         indices = ab_to_bin_indices(ab.unsqueeze(0), centers).squeeze(0)
-        bin_indices_list.append(indices.cpu().numpy().flatten())
+        # Subsample indices too
+        indices_flat = indices.cpu().numpy().flatten()[::4]
+        bin_indices_list.append(indices_flat)
+        
+        if idx % 100 == 0:
+            gc.collect()
     
     class_weights = compute_class_rebalancing_weights(bin_indices_list, num_bins=313, lambda_smooth=0.5)
+    del bin_indices_list
+    gc.collect()
     class_weights_tensor = torch.from_numpy(class_weights).float().to(device)
     print(f"Class weights shape: {class_weights.shape}")
     
@@ -348,8 +383,8 @@ def main():
             dataset, 
             batch_size=args.batch_size, 
             shuffle=True, 
-            num_workers=4,
-            pin_memory=True
+            num_workers=2,  # Reduced to save memory
+            pin_memory=False  # Disabled for MPS
         )
         
         # Optimizer and scheduler
@@ -396,6 +431,14 @@ def main():
         
         print(f"\n{config['name']} training complete!")
         print(f"Checkpoints saved to: {model_out_dir}")
+        
+        # Clean up memory before next model
+        del model, optimizer, scheduler, dataset, dataloader
+        gc.collect()
+        if device.type == 'mps':
+            torch.mps.empty_cache()
+        elif device.type == 'cuda':
+            torch.cuda.empty_cache()
     
     print(f"\n{'='*60}")
     print("All models trained and evaluated!")
