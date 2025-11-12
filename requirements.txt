@@ -1,0 +1,22 @@
+# Image Colorization with SPCR Evaluation
+# Python 3.10+
+
+# Core dependencies
+numpy>=1.24.0
+opencv-python>=4.8.0
+scikit-image>=0.21.0
+scikit-learn>=1.3.0
+tqdm>=4.65.0
+Pillow>=10.0.0
+
+# Deep learning (PyTorch)
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Dataset utilities
+pycocotools>=2.0.6
+
+# PyTorch installation:
+# MPS (Apple Silicon): pip install torch torchvision
+# CUDA 11.8: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+# CPU only: pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
