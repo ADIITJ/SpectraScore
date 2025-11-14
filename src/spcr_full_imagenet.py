@@ -549,10 +549,8 @@ def main():
         save_results_to_csv(results, args.output)
         
         # Compute and print statistics
-        print("\n" + "=" * 60)
         print("SPCR EVALUATION RESULTS (Full Version)")
-        print("=" * 60)
-        print(f"Total images evaluated: {len(results)}")
+        print(f"\nTotal images evaluated: {len(results)}")
         print(f"Weights: Semantic={weights[0]:.2f}, Perceptual={weights[1]:.2f}, Diversity={weights[2]:.2f}")
         print("-" * 60)
         
@@ -562,7 +560,6 @@ def main():
                 std_score = np.std(metric_scores)
                 print(f"{metric_name.capitalize():12s}: {mean_score:.4f} ± {std_score:.4f}")
         
-        print("=" * 60)
         print(f"\nResults saved to: {args.output}")
     
     else:

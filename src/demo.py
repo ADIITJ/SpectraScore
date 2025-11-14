@@ -13,7 +13,7 @@ def run_cmd(cmd, desc):
     print(f"Command: {cmd}\n")
     result = subprocess.run(cmd, shell=True)
     if result.returncode != 0:
-        print(f"\n⚠️  Failed with exit code {result.returncode}")
+        print(f"\nFailed with exit code {result.returncode}")
     else:
         print(f"\n✓ {desc} completed")
     input("\nPress Enter to continue...")
@@ -30,18 +30,18 @@ def main():
         print("="*60)
         print("IMAGE COLORIZATION + SPCR EVALUATION - DEMO")
         print("="*60)
-        print("\n📊 SPCR EVALUATION")
+        print("\nSPCR EVALUATION")
         print("  1. Generate test images")
         print("  2. Run SPCR Full evaluation")
         print("  3. Run SPCR Light evaluation")
         print("  4. Cleanup test images")
         
-        print("\n🎨 COLORIZATION")
+        print("\nCOLORIZATION")
         print("  5. Download 100 COCO images")
         print("  6. Train (5 epochs, quick)")
         print("  7. Train (30 epochs, full)")
         
-        print("\n📈 RESULTS")
+        print("\nRESULTS")
         print("  8. View SPCR results")
         print("  9. View training log")
         print(" 10. Check environment")
@@ -83,7 +83,7 @@ def main():
         elif choice == '10':
             run_cmd("python --version && python -c \"import torch; print(f'PyTorch {torch.__version__}'); print(f'MPS: {torch.backends.mps.is_available()}')\"", "Environment check")
         else:
-            print("\n❌ Invalid choice")
+            print("\nInvalid choice")
             input("Press Enter...")
 
 

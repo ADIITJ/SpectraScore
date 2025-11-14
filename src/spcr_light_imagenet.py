@@ -28,7 +28,6 @@ import numpy as np
 from skimage import color
 from tqdm import tqdm
 
-# Try to import PyTorch for deep features (
 try:
     import torch
     import torch.nn as nn
@@ -561,8 +560,7 @@ def main():
         
         # Compute and print statistics
         print("SPCR EVALUATION RESULTS (Lightweight Version)")
-        print("=" * 60)
-        print(f"Total images evaluated: {len(results)}")
+        print(f"\nTotal images evaluated: {len(results)}")
         print(f"Deep features: {'Enabled (VGG16)' if spcr_metric.use_deep_features else 'Disabled (Histogram)'}")
         print(f"Weights: Perceptual={weights[0]:.2f}, Diversity={weights[1]:.2f}")
         print("-" * 60)
@@ -573,7 +571,6 @@ def main():
                 std_score = np.std(metric_scores)
                 print(f"{metric_name.capitalize():12s}: {mean_score:.4f} ± {std_score:.4f}")
         
-        print("=" * 60)
         print(f"\nResults saved to: {args.output}")
     
     else:
