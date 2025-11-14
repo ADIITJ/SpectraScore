@@ -15,7 +15,7 @@ ENV/
 
 # Data directories (large files)
 data/
-outputs/
+# outputs/
 
 # IDE
 .vscode/
@@ -31,9 +31,9 @@ outputs/
 .ipynb_checkpoints/
 
 # Model checkpoints
-*.pt
-*.pth
-*.ckpt
+# *.pt
+# *.pth
+# *.ckpt
 
 # Logs
 *.log
