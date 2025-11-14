@@ -61,10 +61,6 @@ def main():
         return 1
     
     print(f"""
-╔═══════════════════════════════════════════════════════════════════╗
-║          IMAGE COLORIZATION - COMPLETE PIPELINE                   ║
-╚═══════════════════════════════════════════════════════════════════╝
-
 Configuration:
   • Images:      {args.num_images:,}
   • Epochs:      {args.epochs}
@@ -97,19 +93,19 @@ Estimated total time: {args.num_images/1000 * 5 + args.epochs * 3:.0f}-{args.num
         ]
         
         if not run_command(download_cmd, f"Downloading {args.num_images:,} COCO images"):
-            print("\n❌ Pipeline failed at download step")
+            print("\nPipeline failed at download step")
             return 1
     else:
-        print(f"\n✅ Skipping download - using existing data at {data_dir}")
+        print(f"\nSkipping download - using existing data at {data_dir}")
     
     # Verify download
     image_dir = data_dir / "images"
     if not image_dir.exists():
-        print(f"\n❌ Image directory not found: {image_dir}")
+        print(f"\nImage directory not found: {image_dir}")
         return 1
     
     num_images = len(list(image_dir.glob("*.jpg")))
-    print(f"\n✅ Verified: {num_images:,} images available")
+    print(f"\nVerified: {num_images:,} images available")
     
     # Step 2: Generate test images (if needed)
     if not test_images_dir.exists() or len(list(test_images_dir.glob("*.jpg"))) == 0:
@@ -118,7 +114,7 @@ Estimated total time: {args.num_images/1000 * 5 + args.epochs * 3:.0f}-{args.num
             str(project_root / "src" / "test_spcr.py")
         ]
         if not run_command(test_cmd, "Generating test images"):
-            print("\n⚠️  Warning: Test image generation failed, continuing...")
+            print("\nWarning: Test image generation failed, continuing...")
     
     # Step 3: Train all models
     train_cmd = [
@@ -133,10 +129,9 @@ Estimated total time: {args.num_images/1000 * 5 + args.epochs * 3:.0f}-{args.num
     ]
     
     if not run_command(train_cmd, f"Training all models ({args.epochs} epochs each)"):
-        print("\n❌ Pipeline failed at training step")
+        print("\nPipeline failed at training step")
         return 1
     
-    # Step 4: Generate summary report
     print(f"\n{'='*70}")
     print("GENERATING SUMMARY REPORT")
     print(f"{'='*70}\n")
@@ -189,10 +184,6 @@ Estimated total time: {args.num_images/1000 * 5 + args.epochs * 3:.0f}-{args.num
     # Final summary
     total_time = time.time() - pipeline_start
     print(f"""
-╔═══════════════════════════════════════════════════════════════════╗
-║                    PIPELINE COMPLETED ✅                          ║
-╚═══════════════════════════════════════════════════════════════════╝
-
 Total time: {total_time / 60:.1f} minutes ({total_time / 3600:.2f} hours)
 
 Results saved to:

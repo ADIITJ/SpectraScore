@@ -320,3 +320,45 @@ class L2RegressionNet(nn.Module):
         x = torch.tanh(x) * 110  # ab roughly in [-110, 110]
         
         return x
+
+    def build_model(backbone: str = "resnet18", pretrained: bool = True, 
+                loss_type: str = "classification", num_bins: int = 313) -> nn.Module:
+        """
+        Factory function to build colorization models.
+        
+        Args:
+            backbone: Model backbone type ("resnet18" or "custom")
+            pretrained: Whether to use pretrained weights (for ResNet backbone)
+            loss_type: Type of loss ("classification" or "regression")
+            num_bins: Number of ab bins for classification mode
+        
+        Returns:
+            Colorization model
+        """
+        if loss_type == "classification":
+            # Classification mode - predict distribution over ab bins
+            if backbone == "resnet18":
+                # Use PaperNet with ResNet-18 backbone
+                model = PaperNet(num_classes=num_bins, input_channels=1, use_checkpointing=False)
+            elif backbone == "custom":
+                # Use lightweight MobileLiteVariant
+                model = MobileLiteVariant(num_classes=num_bins, input_channels=1)
+            else:
+                raise ValueError(f"Unknown backbone: {backbone}")
+        
+        elif loss_type == "regression":
+            # Regression mode - directly predict ab values
+            if backbone == "resnet18":
+                # Use L2RegressionNet with ResNet-18
+                model = L2RegressionNet(input_channels=1)
+            elif backbone == "custom":
+                # Use lightweight custom model for regression
+                # For now, use MobileLiteVariant with 2 output channels
+                model = MobileLiteVariant(num_classes=2, input_channels=1)
+            else:
+                raise ValueError(f"Unknown backbone: {backbone}")
+        
+        else:
+            raise ValueError(f"Unknown loss_type: {loss_type}")
+        
+        return model
