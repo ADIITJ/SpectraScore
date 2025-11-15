@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
 """
-Semantic-Perceptual Colour Realism (SPCR) Metric (FUll)
+Semantic-Perceptual Colour Realism (SPCR) Metric 
 
 This script evaluates image colorization quality using three components:
 1. Semantic Plausibility: Measures if colors match semantic categories (uses DeepLabV3)
 2. Perceptual Realism: Compares deep features between original and colorized images (uses VGG16)
 3. Colour Diversity: Measures color variance in Lab space
 
+Each score is a value in range between 0 and 1
+
 Final SPCR Score = 0.4 * Semantic + 0.4 * Perceptual + 0.2 * Diversity
-
-Usage:
-    python spcr_full.py --original original/ --colorized colorized/ --output results_full.csv
-
-Author: Computer Vision Final Project
-Date: November 2025
 """
 
 import argparse
@@ -58,21 +54,8 @@ DEEPLABV3_CLASSES = [
 
 
 
-class SPCRMetric:
-    """
-    Semantic-Perceptual Colour Realism (SPCR) Metric Calculator.
-    
-    This class handles model initialization and metric computation for
-    evaluating image colorization quality.
-    """
-    
+class SPCRMetric: 
     def __init__(self, device: Optional[str] = None):
-        """
-        Initialize SPCR metric with required models.
-        
-        Args:
-            device: Device to run models on ('cuda', 'mps', 'cpu', or None for auto-detect)
-        """
         # Detect device
         if device is None:
             if torch.cuda.is_available():
@@ -86,14 +69,14 @@ class SPCRMetric:
         
         logger.info(f"Using device: {self.device}")
         
-        # Load segmentation model (DeepLabV3)
+        # Load DeepLabV3 model for segmentation analysis
         logger.info("Loading DeepLabV3 segmentation model...")
         self.segmentation_model = models.segmentation.deeplabv3_resnet101(
             pretrained=True
         ).to(self.device)
         self.segmentation_model.eval()
         
-        # Load perceptual model (VGG16)
+        # Load VGG16 model for perceptual analysis
         logger.info("Loading VGG16 perceptual model...")
         vgg16 = models.vgg16(pretrained=True).to(self.device)
         vgg16.eval()
@@ -103,7 +86,7 @@ class SPCRMetric:
         self.perceptual_model = nn.Sequential(*list(vgg16.features[:23])).to(self.device)
         self.perceptual_model.eval()
         
-        # Image preprocessing transforms
+        # Image preprocessing transforms for VGG16  
         self.transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(
@@ -115,24 +98,12 @@ class SPCRMetric:
         logger.info("Models loaded successfully!")
     
     def compute_semantic_score(self, colorized_img: np.ndarray) -> float:
-        """
-        Compute semantic plausibility score.
-        
-        Measures if colors in the colorized image are plausible given the
-        semantic segmentation of the scene.
-        
-        Args:
-            colorized_img: Colorized image in BGR format (H, W, 3)
-        
-        Returns:
-            Semantic plausibility score in [0, 1]
-        """
         try:
-            # Prepare image for segmentation
+            
             img_rgb = cv2.cvtColor(colorized_img, cv2.COLOR_BGR2RGB)
             input_tensor = self.transform(img_rgb).unsqueeze(0).to(self.device)
             
-            # Get segmentation mask
+            # segmentation mask
             with torch.no_grad():
                 output = self.segmentation_model(input_tensor)['out'][0]
                 segmentation_mask = output.argmax(0).cpu().numpy()
@@ -158,7 +129,6 @@ class SPCRMetric:
                 
                 total_pixels += class_pixel_count
                 
-                # Get hue range for this class
                 hue_range = SEMANTIC_HUE_RANGES[class_name]
                 
                 # Handle multiple ranges (e.g., for person/skin tones)
@@ -177,7 +147,7 @@ class SPCRMetric:
             if total_pixels > 0:
                 semantic_score = plausible_pixels / total_pixels
             else:
-                # If no relevant semantic classes found, return neutral score
+                # Neutral score If no relevant class found
                 semantic_score = 0.5
             
             return float(semantic_score)
@@ -191,25 +161,11 @@ class SPCRMetric:
         original_img: np.ndarray, 
         colorized_img: np.ndarray
     ) -> float:
-        """
-        Compute perceptual realism score using deep features.
-        
-        Extracts VGG16 features and computes cosine similarity between
-        original and colorized images.
-        
-        Args:
-            original_img: Original image in BGR format (H, W, 3)
-            colorized_img: Colorized image in BGR format (H, W, 3)
-        
-        Returns:
-            Perceptual realism score in [0, 1]
-        """
         try:
-            # Prepare images
             orig_rgb = cv2.cvtColor(original_img, cv2.COLOR_BGR2RGB)
             col_rgb = cv2.cvtColor(colorized_img, cv2.COLOR_BGR2RGB)
             
-            # Resize to same size if needed
+            # resize to same size
             if orig_rgb.shape != col_rgb.shape:
                 col_rgb = cv2.resize(col_rgb, (orig_rgb.shape[1], orig_rgb.shape[0]))
             
@@ -217,7 +173,7 @@ class SPCRMetric:
             orig_tensor = self.transform(orig_rgb).unsqueeze(0).to(self.device)
             col_tensor = self.transform(col_rgb).unsqueeze(0).to(self.device)
             
-            # Extract features
+            # extract features from both the original image & the colorized image
             with torch.no_grad():
                 orig_features = self.perceptual_model(orig_tensor)
                 col_features = self.perceptual_model(col_tensor)
@@ -226,10 +182,10 @@ class SPCRMetric:
             orig_flat = orig_features.view(orig_features.size(0), -1)
             col_flat = col_features.view(col_features.size(0), -1)
             
-            # Compute cosine similarity
+            # cosine similarity
             cos_sim = nn.functional.cosine_similarity(orig_flat, col_flat)
             
-            # Normalize to [0, 1] (cosine similarity is in [-1, 1])
+            # normalisation to [0,1] 
             perceptual_score = (cos_sim.item() + 1) / 2
             
             return float(perceptual_score)
@@ -239,31 +195,19 @@ class SPCRMetric:
             return 0.0
     
     def compute_diversity_score(self, colorized_img: np.ndarray) -> float:
-        """
-        Compute colour diversity score.
-        
-        Measures the variance of chroma values in Lab color space.
-        Higher variance indicates more diverse colors.
-        
-        Args:
-            colorized_img: Colorized image in BGR format (H, W, 3)
-        
-        Returns:
-            Colour diversity score in [0, 1]
-        """
         try:
             # Convert to Lab color space
             img_rgb = cv2.cvtColor(colorized_img, cv2.COLOR_BGR2RGB)
             img_lab = color.rgb2lab(img_rgb)
             
-            # Extract a and b channels (chroma)
+            # a & b channel values
             a_channel = img_lab[:, :, 1]
             b_channel = img_lab[:, :, 2]
             
-            # Compute chroma magnitude: C = sqrt(a^2 + b^2)
+            # find the chroma
             chroma = np.sqrt(a_channel**2 + b_channel**2)
             
-            # Compute variance of chroma
+            # variance of chroma
             chroma_var = np.var(chroma)
             
             # Normalize variance to [0, 1]
@@ -284,17 +228,6 @@ class SPCRMetric:
         colorized_img: np.ndarray,
         weights: Tuple[float, float, float] = (0.4, 0.4, 0.2)
     ) -> Dict[str, float]:
-        """
-        Compute full SPCR score with all components.
-        
-        Args:
-            original_img: Original image in BGR format (H, W, 3)
-            colorized_img: Colorized image in BGR format (H, W, 3)
-            weights: Tuple of (semantic_weight, perceptual_weight, diversity_weight)
-        
-        Returns:
-            Dictionary with 'semantic', 'perceptual', 'diversity', and 'spcr' scores
-        """
         semantic_score = self.compute_semantic_score(colorized_img)
         perceptual_score = self.compute_perceptual_score(original_img, colorized_img)
         diversity_score = self.compute_diversity_score(colorized_img)
@@ -316,15 +249,6 @@ class SPCRMetric:
 
 
 def load_image(image_path: str) -> Optional[np.ndarray]:
-    """
-    Load an image from disk.
-    
-    Args:
-        image_path: Path to the image file
-    
-    Returns:
-        Image as numpy array in BGR format, or None if loading fails
-    """
     try:
         img = cv2.imread(image_path, cv2.IMREAD_COLOR)
         if img is None:
@@ -351,13 +275,6 @@ def get_image_pairs(
     
     Original folder has nested structure: val/{class_id}/{filename}.JPEG
     Colorized folder is flat: val_colorized/{class_id}_{filename}_siggraph17.png
-    
-    Args:
-        original_folder: Path to folder with original images (nested by class)
-        colorized_folder: Path to folder with colorized images (flat)
-    
-    Returns:
-        List of tuples (display_name, original_path, colorized_path)
     """
     original_path = Path(original_folder)
     colorized_path = Path(colorized_folder)
@@ -408,10 +325,6 @@ def save_results_to_csv(
 ) -> None:
     """
     Save evaluation results to CSV file.
-    
-    Args:
-        results: List of result dictionaries
-        output_path: Path to output CSV file
     """
     if not results:
         logger.warning("No results to save")
@@ -433,9 +346,6 @@ def save_results_to_csv(
 
 
 def main():
-    """
-    Main function to evaluate colorization quality using SPCR metric.
-    """
     parser = argparse.ArgumentParser(
         description='Evaluate image colorization quality using SPCR metric (Full Version)',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -516,7 +426,6 @@ def main():
     logger.info(f"Evaluating {len(image_pairs)} image pairs...")
     
     for filename, orig_path, col_path in tqdm(image_pairs, desc="Processing images"):
-        # Load images
         original_img = load_image(orig_path)
         colorized_img = load_image(col_path)
         
@@ -524,7 +433,7 @@ def main():
             logger.warning(f"Skipping {filename} due to loading error")
             continue
         
-        # Compute SPCR scores
+        # find the SPCR scores
         try:
             result = spcr_metric.compute_spcr(
                 original_img,
@@ -536,7 +445,6 @@ def main():
             result['filename'] = filename
             results.append(result)
             
-            # Accumulate scores for statistics
             for key in scores:
                 scores[key].append(result[key])
         
@@ -544,15 +452,12 @@ def main():
             logger.error(f"Error processing {filename}: {e}")
             continue
     
-    # Save results to CSV
     if results:
         save_results_to_csv(results, args.output)
         
-        # Compute and print statistics
-        print("SPCR EVALUATION RESULTS (Full Version)")
+        print("SPCR EVALUATION RESULTS")
         print(f"\nTotal images evaluated: {len(results)}")
         print(f"Weights: Semantic={weights[0]:.2f}, Perceptual={weights[1]:.2f}, Diversity={weights[2]:.2f}")
-        print("-" * 60)
         
         for metric_name, metric_scores in scores.items():
             if metric_scores:
