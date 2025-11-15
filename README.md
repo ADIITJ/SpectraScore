@@ -376,10 +376,6 @@ SpectraScore/
 │   └── imagenet/
 │       ├── train/                      # 1.28M images, 1000 classes
 │       └── val/                        # 50K images, 1000 classes
-│
-└── docs/                                # Additional documentation
-    ├── COLORIZATION_GUIDE.md
-    └── COMMANDS.md
 ```
 
 ---
