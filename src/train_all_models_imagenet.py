@@ -1,11 +1,6 @@
 #!/usr/bin/env python3
 """
-Train all three colorization models and evaluate with SPCR.
-
-Trains:
-1. PaperNet (full model)
-2. MobileLiteVariant (lightweight)
-3. L2RegressionNet (regression baseline)
+Train the papernet model and evaluate with SPCR.
 """
 
 import argparse
@@ -27,7 +22,6 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 import cv2
 from tqdm import tqdm
 
-# Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from model_colorization import PaperNet, MobileLiteVariant, L2RegressionNet
@@ -70,7 +64,7 @@ def rgb_to_lab_single(rgb_np):
     
 
 class ColorizationDataset(Dataset):
-    """Dataset for colorization training (ImageNet-compatible)."""
+    """Dataset for colorization training"""
     
     def __init__(self, image_dir: Path = None, img_size: int = 224, centers: Optional[np.ndarray] = None, 
                  is_regression: bool = False, image_list: Optional[list] = None):
@@ -78,13 +72,10 @@ class ColorizationDataset(Dataset):
         self.centers = centers
         self.is_regression = is_regression
         
-        # Priority: use provided image_list, otherwise scan directory
         if image_list is not None:
-            # Use provided list (for controlled training set)
             self.image_paths = image_list
             print(f"✓ Dataset created with {len(self.image_paths):,} images from provided list")
         elif image_dir is not None:
-            # Scan directory (fallback behavior)
             self.image_dir = image_dir
             exts = {'.jpg', '.jpeg', '.png', '.bmp', '.JPEG'}
             self.image_paths = []
@@ -169,13 +160,11 @@ class ColorizationDataset(Dataset):
 
 def train_epoch(model, dataloader, optimizer, device, is_regression=False, 
                 class_weights=None, epoch=0, model_out_dir=None, save_interval=2500):
-    """Train for one epoch with mixed precision."""
+    """Train for one epoch"""
     model.train()
     total_loss = 0
     
-    # Enable mixed precision for CUDA
     use_amp = (device.type == 'cuda')
-    # scaler = torch.cuda.amp.GradScaler() if use_amp else None
     scaler = torch.amp.GradScaler('cuda') if use_amp else None
     
     pbar = tqdm(dataloader, desc=f"Epoch {epoch+1}")
@@ -186,7 +175,6 @@ def train_epoch(model, dataloader, optimizer, device, is_regression=False,
         optimizer.zero_grad()
         
         if use_amp:
-            # Mixed precision training
             with torch.cuda.amp.autocast():
                 output = model(L)
                 
@@ -202,7 +190,6 @@ def train_epoch(model, dataloader, optimizer, device, is_regression=False,
             scaler.step(optimizer)
             scaler.update()
         else:
-            # Regular training (CPU/MPS)
             output = model(L)
             
             if is_regression:
@@ -255,7 +242,7 @@ def evaluate_with_spcr(model, test_images_dir, device, centers=None, is_regressi
     colorized_dir = output_dir / "colorized"
     colorized_dir.mkdir(exist_ok=True)
     
-    # Colorize test images
+    # Colorize validation images
     test_images = list(test_images_dir.glob("*.jpg")) + list(test_images_dir.glob("*.png"))
     
     print(f"\nColorizing {len(test_images)} test images...")
@@ -266,10 +253,8 @@ def evaluate_with_spcr(model, test_images_dir, device, centers=None, is_regressi
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             H_orig, W_orig = img.shape[:2]
             
-            # Resize to model input size
             img_resized = cv2.resize(img, (176, 176))
             
-            # Convert to Lab
             L, _ = rgb_to_lab_single(img_resized)
             L = L.unsqueeze(0).to(device)
             
@@ -302,7 +287,6 @@ def evaluate_with_spcr(model, test_images_dir, device, centers=None, is_regressi
             rgb_tensor = lab_to_rgb_tensor(Lab_full_tensor).squeeze(0)  # [3, H, W]
             rgb = (rgb_tensor.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
             
-            # Save
             out_path = colorized_dir / img_path.name
             cv2.imwrite(str(out_path), cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
     
@@ -374,7 +358,6 @@ def main():
         device = torch.device("cpu")
         print(f"Using device: {device}")
     
-    # Compute ab bins and class weights for classification models
     print("\nCollecting ab samples from training data...")
     import random
     random.seed(42)
@@ -401,7 +384,7 @@ def main():
     # sampled_images = random.sample(all_images, sample_size)
     # print(f"✓ [TEST MODE] Using {sample_size:,} images for ab bin computation...")
     
-        # Recursively find all images in nested ImageNet structure
+    # Recursively find all images in nested ImageNet structure
     all_images = []
     for ext in ['*.jpg', '*.jpeg', '*.png', '*.JPEG', '*.JPG', '*.PNG']:
         all_images.extend(list(data_dir.rglob(ext)))
@@ -416,12 +399,12 @@ def main():
     
     print(f"Found {len(images_by_class)} classes")
     
-    # 10k images for AB bin computation (quick, random sampling is fine)
+    # 10k images for ab bin computation 
     ab_sample_size = 10000
     ab_sampled_images = random.sample(all_images, min(ab_sample_size, len(all_images)))
     print(f"✓ AB bins: Using {len(ab_sampled_images):,} images for color bin computation")
     
-    # 200k images for TRAINING (stratified - equal from each class)
+    # 200k images for training
     target_training = 200000
     images_per_class = target_training // len(images_by_class)  # 200 per class
     
@@ -430,14 +413,14 @@ def main():
         n_to_sample = min(images_per_class, len(class_images))
         training_images.extend(random.sample(class_images, n_to_sample))
     
-    print(f"✓ Training: Using {len(training_images):,} images stratified across {len(images_by_class)} classes (~{images_per_class} per class)")
+    print(f"Training: Using {len(training_images):,} images stratified across {len(images_by_class)} classes (~{images_per_class} per class)")
     
     # Save training image list for reference
     training_images_file = out_dir / "training_images_list.txt"
     with open(training_images_file, 'w') as f:
         for img_path in training_images:
             f.write(str(img_path) + '\n')
-    print(f"✓ Saved training image list to {training_images_file}")
+    print(f"Saved training image list to {training_images_file}")
 
     if args.load_ab_centers and Path(args.load_ab_centers).exists():
         print(f"\n✓ Loading precomputed ab centers from: {args.load_ab_centers}")
@@ -466,12 +449,9 @@ def main():
             # ab_samples_list.append(ab_np)
 
             L, ab = rgb_to_lab_single(img)
-            # Use ALL pixels (no subsampling - we have 64GB RAM)
             ab_np = ab.cpu().numpy().reshape(2, -1).T  # [H*W, 2]
-            # REMOVED: ab_np = ab_np[::4]  # No longer needed!
             ab_samples_list.append(ab_np)
             
-            # Free memory every 100 images
             if idx % 100 == 0:
                 gc.collect()
         
@@ -517,7 +497,7 @@ def main():
     class_weights_tensor = torch.from_numpy(class_weights).float().to(device)
     print(f"Class weights shape: {class_weights.shape}")
     
-    # Generate test images if needed
+
     if not test_images_dir.exists() or len(list(test_images_dir.glob("*.jpg"))) == 0:
         print("\nGenerating test images...")
         test_script = Path(__file__).parent / "test_spcr.py"
@@ -531,18 +511,6 @@ def main():
             "kwargs": {"num_classes": 313},
             "is_regression": False,
         }
-        # {
-        #     "name": "MobileLite",
-        #     "model_class": MobileLiteVariant,
-        #     "kwargs": {"num_classes": 313, "base_channels": 32},
-        #     "is_regression": False,
-        # },
-        # {
-        #     "name": "L2Regression",
-        #     "model_class": L2RegressionNet,
-        #     "kwargs": {"base_channels": 32},
-        #     "is_regression": True,
-        # }
     ]
     
     # Train each model
@@ -566,9 +534,8 @@ def main():
         #     is_regression=config['is_regression']
         # )
 
-        # Dataset and dataloader (use stratified training images)
         dataset = ColorizationDataset(
-            image_list=training_images,  # Use our 200k stratified images!
+            image_list=training_images,  # Use 200k images
             img_size=args.img_size,
             centers=centers if not config['is_regression'] else None,
             is_regression=config['is_regression']
@@ -578,12 +545,11 @@ def main():
             dataset, 
             batch_size=args.batch_size, 
             shuffle=True, 
-            num_workers=args.num_workers,  # Reduced to save memory
+            num_workers=args.num_workers,  
             pin_memory=True,
-            persistent_workers=True  # Disabled for MPS
+            persistent_workers=True  
         )
         
-        # Optimizer and scheduler
         optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
         scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs)
         
@@ -595,20 +561,14 @@ def main():
         
         # Train
         for epoch in range(args.epochs):
-            # avg_loss = train_epoch(
-            #     model, dataloader, optimizer, device,
-            #     is_regression=config['is_regression'],
-            #     class_weights=class_weights_tensor if not config['is_regression'] else None,
-            #     epoch=epoch
-            # )
 
             avg_loss = train_epoch(
                 model, dataloader, optimizer, device,
                 is_regression=config['is_regression'],
                 class_weights=class_weights_tensor if not config['is_regression'] else None,
                 epoch=epoch,
-                model_out_dir=model_out_dir,  # ADD THIS
-                save_interval=2500  # ADD THIS
+                model_out_dir=model_out_dir,  
+                save_interval=2500  
             )
             
             current_lr = optimizer.param_groups[0]['lr']
@@ -619,7 +579,6 @@ def main():
                 writer = csv.writer(f)
                 writer.writerow([epoch+1, avg_loss, current_lr])
             
-            # Save checkpoint
             save_checkpoint(model, optimizer, epoch, model_out_dir, config['name'])
             
             scheduler.step()
@@ -637,7 +596,6 @@ def main():
         print(f"\n{config['name']} training complete!")
         print(f"Checkpoints saved to: {model_out_dir}")
         
-        # Clean up memory before next model
         del model, optimizer, scheduler, dataset, dataloader
         gc.collect()
         if device.type == 'mps':
@@ -647,7 +605,6 @@ def main():
     
     print("All models trained and evaluated!")
     print(f"Results saved to: {out_dir}")
-    print(f"{'='*60}")
 
 
 if __name__ == "__main__":
