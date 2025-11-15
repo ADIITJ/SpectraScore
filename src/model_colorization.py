@@ -1,12 +1,3 @@
-#!/usr/bin/env python3
-"""
-Colorization model architectures. 
-
-Implements:
-- PaperNet: VGG-styled network from "Colorful Image Colorization" paper
-- MobileLiteVariant: Memory-efficient variant for low-VRAM training
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,13 +6,9 @@ from typing import Dict, Any, Optional
 
 class PaperNet(nn.Module):
     """
-    Colorization network from Zhang et al. ECCV 2016.
-    
-    Architecture follows Table 4 from paper with dilated convolutions.
-    Input: L channel (1, H, W)
-    Output: Distribution over Q=313 ab bins (313, H, W)
+    Implementation for the paper "Colorful Image Colorization" by Zhang et al. ECCV 2016.
     """
-    
+
     def __init__(self, num_classes: int = 313, input_channels: int = 1, use_checkpointing: bool = False):
         super().__init__()
         self.num_classes = num_classes
@@ -97,7 +84,7 @@ class PaperNet(nn.Module):
         """
         Forward pass.
         
-        Args:
+        The input dimensions are : 
             x: (B, 1, H, W) L channel input
             
         Returns:
