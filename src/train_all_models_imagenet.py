@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-"""
-Train the papernet model and evaluate with SPCR.
-"""
-
 import argparse
 import csv
 import os
@@ -348,9 +344,9 @@ def main():
         # Device (auto-detect CUDA)
     if args.device == "cuda" and torch.cuda.is_available():
         device = torch.device("cuda")
-        print(f"✓ Using device: {device} ({torch.cuda.get_device_name(0)})")
-        print(f"✓ CUDA Version: {torch.version.cuda}")
-        print(f"✓ Available VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
+        print(f"Using device: {device} ({torch.cuda.get_device_name(0)})")
+        print(f"CUDA Version: {torch.version.cuda}")
+        print(f"Available VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
     elif args.device == "mps" and torch.backends.mps.is_available():
         device = torch.device("mps")
         print(f"Using device: {device}")
@@ -423,11 +419,11 @@ def main():
     print(f"Saved training image list to {training_images_file}")
 
     if args.load_ab_centers and Path(args.load_ab_centers).exists():
-        print(f"\n✓ Loading precomputed ab centers from: {args.load_ab_centers}")
+        print(f"\nLoading precomputed ab centers from: {args.load_ab_centers}")
         centers = np.load(args.load_ab_centers)
-        print(f"✓ Loaded {centers.shape[0]} ab bin centers")
+        print(f"Loaded {centers.shape[0]} ab bin centers")
     else:
-        print("\n✗ Computing ab centers from scratch...")
+        print("\nComputing ab centers from scratch...")
 
         ab_samples_list = []
     
@@ -462,7 +458,7 @@ def main():
         
         print("Computing ab bins via KMeans...")
         centers = compute_ab_bins(ab_samples, k=313, cache_path=out_dir / "ab_centers.npy")
-        del ab_samples  # Free memory after KMeans
+        del ab_samples  
         print(f"Centers shape: {centers.shape}")
     
     print("Computing class rebalancing weights from sampled images...")
@@ -470,7 +466,7 @@ def main():
     
     for idx, img_path in enumerate(ab_sampled_images):
         if idx % 500 == 0:
-            print(f"  Computing weights {idx}/{len(ab_sampled_images)}...")
+            print(f"Computing weights {idx}/{len(ab_sampled_images)}...")
         
         img = cv2.imread(str(img_path))
         if img is None:
