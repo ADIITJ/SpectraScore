@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-"""Evaluate trained model on ImageNet val set."""
-
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -35,25 +32,24 @@ def main():
     checkpoint = torch.load(model_path, map_location=device)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
-    print("✓ Model loaded")
+    print("Model loaded")
     
     # Load ab centers
     centers = np.load(ab_centers_path)
-    print(f"✓ Loaded {len(centers)} color bins")
+    print(f"Loaded {len(centers)} color bins")
     
     # Find all images (recursively, include .JPEG)
     print("\nFinding images...")
     test_images = list(val_dir.rglob('*.JPEG')) + list(val_dir.rglob('*.jpg')) + list(val_dir.rglob('*.png'))
-    print(f"✓ Found {len(test_images)} images")
+    print(f"Found {len(test_images)} images")
     
     if len(test_images) == 0:
         print("ERROR: No images found!")
         return
     
     # Colorize
-    print(f"\n{'='*60}")
     print("COLORIZING IMAGENET VALIDATION SET")
-    print(f"{'='*60}\n")
+
     
     model.eval()
     with torch.no_grad():
@@ -105,14 +101,12 @@ def main():
                 print(f"Error processing {img_path.name}: {e}")
                 continue
     
-    print(f"\n✓ Colorization complete!")
-    print(f"✓ Colorized images saved to: {colorized_dir}")
-    print(f"✓ Total colorized: {len(list(colorized_dir.glob('*.png')))}")
+    print(f"\nColorization complete!")
+    print(f"Colorized images saved to: {colorized_dir}")
+    print(f"Total colorized: {len(list(colorized_dir.glob('*.png')))}")
     
     # Now run SPCR evaluation
-    print(f"\n{'='*60}")
     print("RUNNING SPCR EVALUATION")
-    print(f"{'='*60}\n")
     
     import subprocess
     spcr_script = Path("src/spcr_full_imagenet.py")
@@ -129,7 +123,7 @@ def main():
     
     try:
         subprocess.run(cmd, check=True)
-        print(f"\n✓ SPCR results saved to: {results_csv}")
+        print(f"\nSPCR results saved to: {results_csv}")
     except subprocess.CalledProcessError as e:
         print(f"SPCR evaluation failed: {e}")
 
